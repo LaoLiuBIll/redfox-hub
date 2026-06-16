@@ -1,0 +1,80 @@
+name: Daily Content Update
+
+on:
+  schedule:
+    # 每天北京时间 08:00 运行 (UTC 00:00)
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install python-dateutil==2.8.2 requests
+
+      - name: Fetch trending hub top10
+        env:
+          REDFOX_API_KEY: ${{ secrets.REDFOX_API_KEY }}
+        run: |
+          python scripts/fetch_hotspot.py --output json > data/hotspot_raw.json
+          python scripts/generate_structured.py --input data/hotspot_raw.json --output data/hotspot_structured.json
+
+      - name: Fetch gzh AI feed
+        env:
+          REDFOX_API_KEY: ${{ secrets.REDFOX_API_KEY }}
+        run: |
+          python scripts/fetch_gzh.py --count 50 --output data/gzh_feed.json
+
+      - name: Fetch wechat channels AI feed
+        env:
+          REDFOX_API_KEY: ${{ secrets.REDFOX_API_KEY }}
+        run: |
+          python scripts/fetch_channels.py --page-size 50 --output data/channels_feed.json
+
+      - name: Fetch douyin daily hot
+        env:
+          REDFOX_API_KEY: ${{ secrets.REDFOX_API_KEY }}
+        run: |
+          python scripts/fetch_douyin.py --limit 50 --output data/douyin_hot.json
+
+      - name: Generate site
+        run: |
+          python scripts/generate_site.py --date $(date +%Y-%m-%d)
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
