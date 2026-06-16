@@ -445,7 +445,7 @@ def get_default_template():
 <body>
     <div class="container">
         <header>
-            <h1>RedFox Hub</h1>
+            <h1>一群胖子</h1>
             <p class="subtitle">全网热点聚合 · 原创内容 · 每周热榜</p>
             <p class="update-time">更新时间: <!--UPDATE_TIME--></p>
         </header>
@@ -484,7 +484,7 @@ def get_default_template():
         </section>
         
         <footer>
-            <p>RedFox Hub · 每日自动更新 · 数据来源: redfox.hk</p>
+            <p>每日自动更新 · 数据来源: redfox.hk</p>
         </footer>
     </div>
     
