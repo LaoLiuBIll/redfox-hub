@@ -35,8 +35,8 @@ jobs:
         env:
           REDFOX_API_KEY: ${{ secrets.EDFOX_API_KEY }}
         run: |
-          python scripts/fetch_hotspot.py --output json > data/hotspot_raw.json
-          python scripts/generate_structured.py --input data/hotspot_raw.json --output data/hotspot_structured.json
+          mkdir -p data
+          python scripts/fetch_hotspot.py --output data/hotspot_raw.json
 
       - name: Fetch gzh AI feed
         env:
