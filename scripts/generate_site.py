@@ -73,36 +73,74 @@ def format_hotspot(data):
     
     return html
 
-def format_gzh(data):
-    """格式化公众号数据为HTML"""
+def format_gzh_accounts(data):
+    """从公众号文章数据中提取热门账号推荐"""
     if not data or 'articles' not in data or not data['articles']:
         return '<div class="empty-state">暂无数据</div>'
     
-    articles = data['articles'][:20]
-    html = ''
+    articles = data['articles']
     
+    # 按账号聚合数据
+    accounts = {}
     for article in articles:
-        title = article.get('title', '未知标题')
-        url = article.get('url', '#')
-        author = article.get('userName', article.get('author', '未知作者'))
+        user_name = article.get('userName', '未知账号')
+        user_head = article.get('userHeadUrl', '')
         read_count = article.get('readCount') or 0
         like_count = article.get('likeCount') or 0
-        category = article.get('type', article.get('category', 'AI'))
+        
+        if user_name not in accounts:
+            accounts[user_name] = {
+                'name': user_name,
+                'head': user_head,
+                'articles': 0,
+                'total_reads': 0,
+                'total_likes': 0,
+                'latest_article': article.get('title', '')
+            }
+        
+        accounts[user_name]['articles'] += 1
+        accounts[user_name]['total_reads'] += read_count
+        accounts[user_name]['total_likes'] += like_count
+    
+    # 按总阅读量排序
+    sorted_accounts = sorted(accounts.values(), key=lambda x: x['total_reads'], reverse=True)
+    
+    html = ''
+    for i, account in enumerate(sorted_accounts[:15], 1):
+        name = account['name']
+        head = account['head']
+        articles = account['articles']
+        reads = account['total_reads']
+        likes = account['total_likes']
+        latest = account['latest_article']
         
         # 格式化数字
-        read_str = f"{read_count//10000}w" if read_count >= 10000 else str(read_count)
-        like_str = f"{like_count//10000}w" if like_count >= 10000 else str(like_count)
+        reads_str = f"{reads//10000}w" if reads >= 10000 else str(reads)
+        likes_str = f"{likes//10000}w" if likes >= 10000 else str(likes)
+        
+        # 头像
+        head_img = f'<img src="{head}" style="width:40px;height:40px;border-radius:50%;margin-right:10px;" />' if head else ''
         
         html += f'''
         <div class="card">
-            <div class="card-header">
-                <a href="{url}" target="_blank" class="card-title">{title}</a>
-                <span class="badge badge-trend">{category}</span>
-            </div>
-            <div class="meta">
-                <span>✍️ {author}</span>
-                <span>👁️ {read_str}阅读</span>
-                <span>👍 {like_str}赞</span>
+            <div class="hotspot-item">
+                <div class="rank">#{i}</div>
+                <div style="flex: 1;">
+                    <div class="card-header">
+                        <div style="display:flex;align-items:center;">
+                            {head_img}
+                            <span class="card-title">{name}</span>
+                        </div>
+                        <span class="badge badge-hot">{reads_str}阅读</span>
+                    </div>
+                    <div class="meta">
+                        <span>📝 {articles}篇文章</span>
+                        <span>👍 {likes_str}赞</span>
+                    </div>
+                    <div style="margin-top:8px;color:#aaa;font-size:0.85em;">
+                        最新: {latest}
+                    </div>
+                </div>
             </div>
         </div>
         '''
@@ -213,7 +251,7 @@ def generate_site(date_str=None):
     
     # 生成内容
     hotspot_html = format_hotspot(hotspot_data)
-    gzh_html = format_gzh(gzh_data)
+    gzh_html = format_gzh_accounts(gzh_data)
     channels_html = format_channels(channels_data)
     douyin_html = format_douyin(douyin_data)
     
@@ -397,7 +435,7 @@ def get_default_template():
         
         <nav class="nav">
             <a href="#hotspot" class="active" onclick="showSection(\'hotspot\')">全网热点</a>
-            <a href="#gzh" onclick="showSection(\'gzh\')">公众号AI</a>
+            <a href="#gzh" onclick="showSection(\'gzh\')">公众号热门</a>
             <a href="#channels" onclick="showSection(\'channels\')">视频号AI</a>
             <a href="#douyin" onclick="showSection(\'douyin\')">抖音热榜</a>
         </nav>
@@ -408,7 +446,7 @@ def get_default_template():
         </section>
         
         <section id="gzh" class="section">
-            <h2 style="margin-bottom: 20px;">公众号AI资讯</h2>
+            <h2 style="margin-bottom: 20px;">公众号热门账号推荐</h2>
             <!--GZH_CONTENT-->
         </section>
         
