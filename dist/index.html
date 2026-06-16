@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RedFox Hub - 每日热点聚合</title>
+    <title>一群胖子 - 每日热点聚合</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -15,18 +15,39 @@
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         header {
             text-align: center;
-            padding: 40px 0;
+            padding: 30px 0 20px;
             border-bottom: 1px solid #333;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         h1 { font-size: 2.5em; color: #ff6b35; margin-bottom: 10px; }
         .subtitle { color: #888; font-size: 1.1em; }
+        .date-selector {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+        .date-selector label { color: #888; }
+        .date-selector select {
+            background: #1a1a2e;
+            color: #fff;
+            border: 1px solid #ff6b35;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            outline: none;
+        }
+        .date-selector select:hover {
+            background: #2a2a3e;
+        }
         .update-time { color: #666; font-size: 0.9em; margin-top: 10px; }
         .nav {
             display: flex;
             justify-content: center;
-            gap: 15px;
-            margin-bottom: 30px;
+            gap: 12px;
+            margin-bottom: 25px;
             flex-wrap: wrap;
         }
         .nav a {
@@ -37,6 +58,7 @@
             border-radius: 20px;
             transition: all 0.3s;
             font-size: 0.9em;
+            cursor: pointer;
         }
         .nav a:hover, .nav a.active {
             background: #ff6b35;
@@ -51,8 +73,8 @@
         .card {
             background: #1a1a2e;
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
+            padding: 18px;
+            margin-bottom: 12px;
             border: 1px solid #2a2a3e;
             transition: transform 0.2s, border-color 0.2s;
         }
@@ -64,11 +86,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             gap: 10px;
         }
         .card-title {
-            font-size: 1.1em;
+            font-size: 1.05em;
             color: #fff;
             text-decoration: none;
             flex: 1;
@@ -89,18 +111,18 @@
             gap: 12px;
             color: #888;
             font-size: 0.85em;
-            margin-top: 8px;
+            margin-top: 6px;
             flex-wrap: wrap;
         }
         .rank {
-            font-size: 1.8em;
+            font-size: 1.6em;
             font-weight: bold;
             color: #ff6b35;
-            min-width: 45px;
+            min-width: 40px;
         }
         .hotspot-item {
             display: flex;
-            gap: 15px;
+            gap: 12px;
             align-items: start;
         }
         .platform-tag {
@@ -122,1199 +144,340 @@
             padding: 60px 20px;
             color: #666;
         }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ff6b35;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
         footer {
             text-align: center;
-            padding: 40px 0;
+            padding: 30px 0;
             color: #666;
             border-top: 1px solid #333;
-            margin-top: 40px;
+            margin-top: 30px;
         }
         @media (max-width: 768px) {
             h1 { font-size: 1.8em; }
             .hotspot-item { flex-direction: column; }
-            .rank { font-size: 1.5em; }
+            .rank { font-size: 1.3em; }
             .card-header { flex-direction: column; align-items: flex-start; }
-            .nav { gap: 8px; }
+            .nav { gap: 6px; }
             .nav a { padding: 6px 12px; font-size: 0.85em; }
+            .date-selector { flex-direction: column; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>RedFox Hub</h1>
+            <h1>一群胖子</h1>
             <p class="subtitle">全网热点聚合 · 原创内容 · 每周热榜</p>
-            <p class="update-time">更新时间: 2026-06-16 21:58:34</p>
+            <div class="date-selector">
+                <label>📅 选择日期：</label>
+                <select id="dateSelect" onchange="loadDate(this.value)">
+                    <option value="2026-06-16" selected>2026年06月16日</option>
+
+                </select>
+            </div>
+            <p class="update-time" id="updateTime">加载中...</p>
         </header>
         
         <nav class="nav">
-            <a href="#hotspot" class="active" onclick="showSection('hotspot')">全网热点</a>
-            <a href="#wechat-original" onclick="showSection('wechat-original')">公众号原创</a>
-            <a href="#xhs" onclick="showSection('xhs')">小红书热榜</a>
-            <a href="#channels" onclick="showSection('channels')">视频号AI</a>
-            <a href="#douyin" onclick="showSection('douyin')">抖音热榜</a>
+            <a href="#hotspot" class="active" onclick="showSection('hotspot')">🔥 全网热点</a>
+            <a href="#wechat-original" onclick="showSection('wechat-original')">📝 公众号原创</a>
+            <a href="#xhs" onclick="showSection('xhs')">📕 小红书热榜</a>
+            <a href="#channels" onclick="showSection('channels')">🎬 视频号AI</a>
+            <a href="#douyin" onclick="showSection('douyin')">🎵 抖音热榜</a>
         </nav>
         
         <section id="hotspot" class="section active">
-            <h2 style="margin-bottom: 20px;">🔥 全网聚合热点 TOP10</h2>
-            
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#1</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.kuaishou.com/search/video?searchKey=世界杯西班牙vs佛得角" target="_blank" class="card-title">世界杯西班牙vs佛得角</a>
-                        <span class="badge badge-hot">1302万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-kuaishou">快手</span></span>
-                        <span>⏱️ 在榜7小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#2</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.toutiao.com/trending/7651591985962893353/" target="_blank" class="card-title">人的脚怎么踢得过佛得角</a>
-                        <span class="badge badge-hot">186万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-toutiao">头条</span></span>
-                        <span>⏱️ 在榜3小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#3</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.baidu.com/s?wd=佛得角官方曾感谢中国帮圆梦世界杯" target="_blank" class="card-title">佛得角官方曾感谢中国帮圆梦世界杯</a>
-                        <span class="badge badge-hot">742万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-baidu">百度</span></span>
-                        <span>⏱️ 在榜4小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#4</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://s.weibo.com/weibo?q=%23佛得角官方感谢中国帮圆梦世界杯" target="_blank" class="card-title">佛得角官方感谢中国帮圆梦世界杯</a>
-                        <span class="badge badge-hot">29万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-weibo">微博</span></span>
-                        <span>⏱️ 在榜7小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#5</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.douyin.com/search/西班牙0:0佛得角" target="_blank" class="card-title">西班牙0:0佛得角</a>
-                        <span class="badge badge-hot">780万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-douyin">抖音</span></span>
-                        <span>⏱️ 在榜18小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#6</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.douyin.com/search/网友实拍佛得角球迷反应" target="_blank" class="card-title">网友实拍佛得角球迷反应</a>
-                        <span class="badge badge-hot">774万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-douyin">抖音</span></span>
-                        <span>⏱️ 在榜7小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#7</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.douyin.com/search/佛得角40岁门将赛后哭了" target="_blank" class="card-title">佛得角40岁门将赛后哭了</a>
-                        <span class="badge badge-hot">775万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-douyin">抖音</span></span>
-                        <span>⏱️ 在榜6小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#8</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.douyin.com/search/佛得角在哪" target="_blank" class="card-title">佛得角在哪</a>
-                        <span class="badge badge-hot">899万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-douyin">抖音</span></span>
-                        <span>⏱️ 在榜11小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#9</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.baidu.com/s?wd=佛得角全国沸腾%20庆祝时说中文：谢谢" target="_blank" class="card-title">佛得角全国沸腾庆祝时说中文：谢谢</a>
-                        <span class="badge badge-hot">780万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-baidu">百度</span></span>
-                        <span>⏱️ 在榜1小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#10</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://s.weibo.com/weibo?q=%23C罗也有佛得角血统" target="_blank" class="card-title">C罗也有佛得角血统</a>
-                        <span class="badge badge-hot">26万</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag plat-weibo">微博</span></span>
-                        <span>⏱️ 在榜1小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
+            <h2 style="margin-bottom: 15px;">🔥 全网聚合热点 TOP10</h2>
+            <div id="hotspotContent"><div class="loading">加载中</div></div>
         </section>
         
         <section id="wechat-original" class="section">
-            <h2 style="margin-bottom: 20px;">📝 公众号原创热门文章</h2>
-            
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#1</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzI0Njc5NzM5OQ==&mid=2247506955&idx=1&sn=2e8c0cf06fa261a8fa70fe4fbb3f2c1f#rd" target="_blank" class="card-title">AI Agent、Skill和Vibe Coding的概念详解</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 超人的电话亭</span>
-                        <span>👁️ 1229阅读</span>
-                        <span>👍 38赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#2</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=Mzk5MDMwNzU5NQ==&mid=2247483917&idx=1&sn=23419e17884a8df38462b957144e9d0b#rd" target="_blank" class="card-title">你的代码被几个AI大模型轮流摆弄</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ v3n0m</span>
-                        <span>👁️ 1131阅读</span>
-                        <span>👍 4赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#3</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzcxMDA5NTI0OA==&mid=2247488067&idx=1&sn=37a2563af5c993258e7eef5197d36a32#rd" target="_blank" class="card-title">AI Agent Loop到底是什么？多数人一上来就用错了丨Greg</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 晚点再听LaterCast</span>
-                        <span>👁️ 647阅读</span>
-                        <span>👍 20赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#4</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzA3Njc1MDU0OQ==&mid=2650935153&idx=1&sn=af79603874215feb966363c048cf59e0#rd" target="_blank" class="card-title">颤抖吧！最小最丝滑 AI 智能体 AA 3.2 发布</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ aardio</span>
-                        <span>👁️ 2428阅读</span>
-                        <span>👍 81赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#5</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzkwOTYyMTU3MQ==&mid=2247487020&idx=1&sn=3c8765059afe2be189f6608beed6c4c2#rd" target="_blank" class="card-title">Nature揭秘：GPT-5.5三种学术科研常见场景+专业Prompt</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 易智能AI</span>
-                        <span>👁️ 572阅读</span>
-                        <span>👍 11赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#6</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzkzMjkwMzI3MQ==&mid=2247487566&idx=1&sn=0af3784b8d5402cfbf88fa498e5e1e83#rd" target="_blank" class="card-title">工信部发文促进AI+通信：三大运营商转向Agent基础设施服务</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 快思慢想研究院</span>
-                        <span>👁️ 546阅读</span>
-                        <span>👍 8赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#7</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzA5NTU4NDM2MA==&mid=2650019734&idx=1&sn=0cff7d36931e090f8d152d16969e7223#rd" target="_blank" class="card-title">DeepMind创始人哈萨比斯：人类大脑是证明AGI可行的唯一证据，AI将模拟宇宙万物</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 瓜哥AI新知</span>
-                        <span>👁️ 604阅读</span>
-                        <span>👍 18赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#8</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzIwMDA2NTM5MA==&mid=2247485802&idx=1&sn=fbb425d8bfe26b8f5283e2e56c5de780#rd" target="_blank" class="card-title">大模型价格战再升级：腾讯云降价50%，DeepSeek砍到几乎免费</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ AI全球视野</span>
-                        <span>👁️ 1689阅读</span>
-                        <span>👍 0赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#9</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=Mzk2NDU4ODA5MQ==&mid=2247486859&idx=1&sn=66c7e82042c88de1e7ec9b479cc21fe4#rd" target="_blank" class="card-title">腾讯已参与前阿里巴巴通义千问（Qwen）技术负责人林俊旸新创AI公司的融资，投资规模达数千万美元</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 灵机智变</span>
-                        <span>👁️ 814阅读</span>
-                        <span>👍 3赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#10</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzAxNDI4NjU0MQ==&mid=2650083868&idx=2&sn=2a058f4c2b26af5c0bd086e6aa4018a2#rd" target="_blank" class="card-title">副业增收首选！面向深圳启动 “AI智能体应用师人才专业化培训计划”，20岁以上深圳居民符合条件都可报考</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 有你圳好</span>
-                        <span>👁️ 552阅读</span>
-                        <span>👍 7赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#11</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzkwODczNTIyNw==&mid=2247485227&idx=1&sn=a2b4c89fc41b26d3d09e6ae040799a8a#rd" target="_blank" class="card-title">CVPR 26｜NAF：训练一次，给任意 Vision Foundation Model 做特征上采样</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ AI上分搭子</span>
-                        <span>👁️ 575阅读</span>
-                        <span>👍 5赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#12</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzkzNTM1MDI4MQ==&mid=2247523634&idx=1&sn=6eddea16d3e3ba114b9977039b689f39#rd" target="_blank" class="card-title">刚刚，GPT-5.5被中国纯血AI反超了！</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ JAVA葵花宝典</span>
-                        <span>👁️ 668阅读</span>
-                        <span>👍 0赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#13</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MjM5NjAzMjM4MA==&mid=2651270888&idx=1&sn=99c4e194bd5d30d3a721c322aa2c8833#rd" target="_blank" class="card-title">物流规划AI Agent与物流仿真软件，颠覆性差异在哪？</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 物流沙龙</span>
-                        <span>👁️ 1297阅读</span>
-                        <span>👍 6赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#14</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MjM5NTMzNzg3NA==&mid=2650730063&idx=1&sn=68ade135a9ff21501aab9f1e23d3cb5f#rd" target="_blank" class="card-title">Gartner发布《Innovation Insight: Enterprise Agent Competency》（企业 AI Agent 能力框架），特赞为全球五家代表厂商之一</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 特赞Tezign</span>
-                        <span>👁️ 704阅读</span>
-                        <span>👍 24赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#15</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzA5MDEzNjQwMA==&mid=2656382179&idx=2&sn=c313ccd320a1706861a0dbd1b6d8a312#rd" target="_blank" class="card-title">智谱暴涨近33%，AI硬件概念股集体大涨</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 中国基金报</span>
-                        <span>👁️ 6269阅读</span>
-                        <span>👍 28赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#16</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzA4MTQ4NjQzMw==&mid=2652805057&idx=1&sn=6f1215645bc11d2a59ba059e6d74c2c7#rd" target="_blank" class="card-title">AIEC 2026明天北京开幕，打赢三场硬仗，Agent才能从试点走向规模化！</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 智东西</span>
-                        <span>👁️ 2w阅读</span>
-                        <span>👍 41赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#17</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzU2Njg0OTEyNQ==&mid=2247494790&idx=1&sn=ad80fa64ee3627bff243ac152fe2095f#rd" target="_blank" class="card-title">告别抽卡焦虑，OiiOii2.0升级开启AI创作“自动挡”模式</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ AI异类弗兰克</span>
-                        <span>👁️ 4836阅读</span>
-                        <span>👍 15赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#18</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzkzNzcwNzE1MA==&mid=2247586751&idx=1&sn=b4fb9b82197f93c5e422092696651b67#rd" target="_blank" class="card-title">突发！Anthropic全球停用Claude 5</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 扩展迷AIGC</span>
-                        <span>👁️ 7426阅读</span>
-                        <span>👍 12赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#19</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MzA5ODEzMjIyMA==&mid=2247736752&idx=1&sn=aed8d804c6e119933d0aea85a26c0397#rd" target="_blank" class="card-title">国产 Coding 争霸赛：MiniMax 爆冷登顶，DeepSeek 性价比称王</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ AI科技评论</span>
-                        <span>👁️ 1w阅读</span>
-                        <span>👍 99赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#20</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://mp.weixin.qq.com/s?__biz=MjM5MjE0ODY2MA==&mid=2652448119&idx=2&sn=ea89de88558ac35564754b61b5deb7e5#rd" target="_blank" class="card-title">深圳6月AI智能体培训启动：学习开发和搭建智能体（Agent）、智能体工具！20岁以上符合条件居民均可报考</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ 深圳新闻网</span>
-                        <span>👁️ 737阅读</span>
-                        <span>👍 5赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
+            <h2 style="margin-bottom: 15px;">📝 公众号原创热门文章</h2>
+            <div id="wechatOriginalContent"><div class="loading">加载中</div></div>
         </section>
         
         <section id="xhs" class="section">
-            <h2 style="margin-bottom: 20px;">📕 小红书每周热门笔记</h2>
-            <div class="empty-state">暂无数据</div>
+            <h2 style="margin-bottom: 15px;">📕 小红书每周热门笔记</h2>
+            <div id="xhsContent"><div class="loading">加载中</div></div>
         </section>
         
         <section id="channels" class="section">
-            <h2 style="margin-bottom: 20px;">🎬 视频号AI热门</h2>
-            
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">AI Agent、Skill和Vibe Coding的概念详解</span>
-                <span class="badge badge-trend">#AI教程,#AI大模型,#AI热点</span>
-            </div>
-            <div class="meta">
-                <span>🎬 超人的电话亭</span>
-                <span>❤️ 38赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">你的代码被几个AI大模型轮流摆弄</span>
-                <span class="badge badge-trend">#AI,#AI大模型</span>
-            </div>
-            <div class="meta">
-                <span>🎬 v3n0m</span>
-                <span>❤️ 4赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">AI Agent Loop到底是什么？多数人一上来就用错了丨Greg</span>
-                <span class="badge badge-trend">#AI大模型,#AI教程</span>
-            </div>
-            <div class="meta">
-                <span>🎬 晚点再听LaterCast</span>
-                <span>❤️ 20赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">颤抖吧！最小最丝滑 AI 智能体 AA 3.2 发布</span>
-                <span class="badge badge-trend">#AI,#AI创作,#Prompt</span>
-            </div>
-            <div class="meta">
-                <span>🎬 aardio</span>
-                <span>❤️ 81赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 16评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">Nature揭秘：GPT-5.5三种学术科研常见场景+专业Prompt</span>
-                <span class="badge badge-trend">#AI大模型,#Prompt,#AI创作</span>
-            </div>
-            <div class="meta">
-                <span>🎬 易智能AI</span>
-                <span>❤️ 11赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">工信部发文促进AI+通信：三大运营商转向Agent基础设施服务</span>
-                <span class="badge badge-trend">#AI,#Prompt,#AI教程</span>
-            </div>
-            <div class="meta">
-                <span>🎬 快思慢想研究院</span>
-                <span>❤️ 8赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 1评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">DeepMind创始人哈萨比斯：人类大脑是证明AGI可行的唯一证据，AI将模拟宇宙万物</span>
-                <span class="badge badge-trend">#AI,#AI热点,#AI大模型,#AI教程</span>
-            </div>
-            <div class="meta">
-                <span>🎬 瓜哥AI新知</span>
-                <span>❤️ 18赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">大模型价格战再升级：腾讯云降价50%，DeepSeek砍到几乎免费</span>
-                <span class="badge badge-trend">#AI热点,#AI大模型</span>
-            </div>
-            <div class="meta">
-                <span>🎬 AI全球视野</span>
-                <span>❤️ 0赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">腾讯已参与前阿里巴巴通义千问（Qwen）技术负责人林俊旸新创AI公司的融资，投资规模达数千万美元</span>
-                <span class="badge badge-trend">#AI,#AI大模型,#Prompt,#AI创作</span>
-            </div>
-            <div class="meta">
-                <span>🎬 灵机智变</span>
-                <span>❤️ 3赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">副业增收首选！面向深圳启动 “AI智能体应用师人才专业化培训计划”，20岁以上深圳居民符合条件都可报考</span>
-                <span class="badge badge-trend">#AI,#AI创作,#Prompt</span>
-            </div>
-            <div class="meta">
-                <span>🎬 有你圳好</span>
-                <span>❤️ 7赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 2评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">CVPR 26｜NAF：训练一次，给任意 Vision Foundation Model 做特征上采样</span>
-                <span class="badge badge-trend">#AI热点</span>
-            </div>
-            <div class="meta">
-                <span>🎬 AI上分搭子</span>
-                <span>❤️ 5赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">刚刚，GPT-5.5被中国纯血AI反超了！</span>
-                <span class="badge badge-trend">#AI,#AI大模型,#AI创作,#Prompt</span>
-            </div>
-            <div class="meta">
-                <span>🎬 JAVA葵花宝典</span>
-                <span>❤️ 0赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">物流规划AI Agent与物流仿真软件，颠覆性差异在哪？</span>
-                <span class="badge badge-trend">#AI,#Prompt,#AI教程</span>
-            </div>
-            <div class="meta">
-                <span>🎬 物流沙龙</span>
-                <span>❤️ 6赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">Gartner发布《Innovation Insight: Enterprise Agent Competency》（企业 AI Agent 能力框架），特赞为全球五家代表厂商之一</span>
-                <span class="badge badge-trend">#AI,#Prompt,#AI教程</span>
-            </div>
-            <div class="meta">
-                <span>🎬 特赞Tezign</span>
-                <span>❤️ 24赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">智谱暴涨近33%，AI硬件概念股集体大涨</span>
-                <span class="badge badge-trend">#AI,#AI大模型,#Prompt,#AI创作</span>
-            </div>
-            <div class="meta">
-                <span>🎬 中国基金报</span>
-                <span>❤️ 28赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">AIEC 2026明天北京开幕，打赢三场硬仗，Agent才能从试点走向规模化！</span>
-                <span class="badge badge-trend">#Prompt,#AI教程</span>
-            </div>
-            <div class="meta">
-                <span>🎬 智东西</span>
-                <span>❤️ 41赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">告别抽卡焦虑，OiiOii2.0升级开启AI创作“自动挡”模式</span>
-                <span class="badge badge-trend">#AI,#AI创作</span>
-            </div>
-            <div class="meta">
-                <span>🎬 AI异类弗兰克</span>
-                <span>❤️ 15赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">突发！Anthropic全球停用Claude 5</span>
-                <span class="badge badge-trend">#AI大模型,#Prompt,#AI创作</span>
-            </div>
-            <div class="meta">
-                <span>🎬 扩展迷AIGC</span>
-                <span>❤️ 12赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">国产 Coding 争霸赛：MiniMax 爆冷登顶，DeepSeek 性价比称王</span>
-                <span class="badge badge-trend">#AI大模型,#Prompt,#AI教程</span>
-            </div>
-            <div class="meta">
-                <span>🎬 AI科技评论</span>
-                <span>❤️ 99赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 6评论</span>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">深圳6月AI智能体培训启动：学习开发和搭建智能体（Agent）、智能体工具！20岁以上符合条件居民均可报考</span>
-                <span class="badge badge-trend">#AI,#Prompt,#AI教程,#AI创作</span>
-            </div>
-            <div class="meta">
-                <span>🎬 深圳新闻网</span>
-                <span>❤️ 5赞</span>
-                <span>🔄 0分享</span>
-                <span>💬 0评论</span>
-            </div>
-        </div>
-        
+            <h2 style="margin-bottom: 15px;">🎬 视频号AI热门</h2>
+            <div id="channelsContent"><div class="loading">加载中</div></div>
         </section>
         
         <section id="douyin" class="section">
-            <h2 style="margin-bottom: 20px;">🎵 抖音每日热榜</h2>
-            
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#1</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651399399658196672" target="_blank" class="card-title">饭店的暑假工，商务饭局！</a>
-                        <span class="badge badge-hot">222w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 周小闹 (3065w+)</span>
-                        <span>🏷️ 小剧场</span>
-                        <span>💬 19000</span>
-                        <span>🔄 422799</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#2</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651487820292295986" target="_blank" class="card-title">硬气！周锡玮：台湾人就是堂堂正正的中国人，怕什么！谁妄图抹灭这个事实就是罪人。特朗普都说不支持“台独</a>
-                        <span class="badge badge-hot">118w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 中国新闻社 (1298w+)</span>
-                        <span>🏷️ 时政社会</span>
-                        <span>💬 82307</span>
-                        <span>🔄 59299</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#3</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651552796618059195" target="_blank" class="card-title">镜子里的人真面熟！</a>
-                        <span class="badge badge-hot">118w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 小四！ (139w+)</span>
-                        <span>🏷️ 生活记录</span>
-                        <span>💬 49933</span>
-                        <span>🔄 2575002</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#4</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651632279650929920" target="_blank" class="card-title">同一优惠套餐，新客秒办，老客碰壁……#多地用户投诉运营商“新老用户不同权”   这样的运营商的“杀熟</a>
-                        <span class="badge badge-hot">109w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 央视新闻 (18503w+)</span>
-                        <span>🏷️ 时政社会</span>
-                        <span>💬 106</span>
-                        <span>🔄 71444</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#5</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651458919981698310" target="_blank" class="card-title">女孩家中失火试卷被烧，消防员贴心送上新试卷……@中国消防 @湖北消防</a>
-                        <span class="badge badge-hot">107w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 央视新闻 (18503w+)</span>
-                        <span>🏷️ 时政社会</span>
-                        <span>💬 110</span>
-                        <span>🔄 1553014</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#6</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651357225294318833" target="_blank" class="card-title">此生走过多少的岁月…</a>
-                        <span class="badge badge-hot">90w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 一天只饿三顿 (1982)</span>
-                        <span>🏷️ None</span>
-                        <span>💬 23229</span>
-                        <span>🔄 464158</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#7</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651172151235922164" target="_blank" class="card-title">🎁🎊</a>
-                        <span class="badge badge-hot">84w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 时代少年团-贺峻霖 (395w+)</span>
-                        <span>🏷️ 明星娱乐</span>
-                        <span>💬 96611</span>
-                        <span>🔄 56213</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#8</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651521227139321103" target="_blank" class="card-title">大雨来临之前，收割机星夜抢收……光影交错，见证“粒粒皆辛苦”！@我家泰迪🐻叫欢欢</a>
-                        <span class="badge badge-hot">79w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 央视新闻 (18503w+)</span>
-                        <span>🏷️ 时政社会</span>
-                        <span>💬 126</span>
-                        <span>🔄 58737</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#9</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651446791988128122" target="_blank" class="card-title">非遗文化传承#江南style #双人舞 #江南style双人舞</a>
-                        <span class="badge badge-hot">76w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 陈之猴 (1w+)</span>
-                        <span>🏷️ 人文</span>
-                        <span>💬 7737</span>
-                        <span>🔄 400901</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#10</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651179169128245864" target="_blank" class="card-title">人心中的成见或许是一座大山 @战神7 大哥@二烟 导演@小包老师😇 摄像@迪锥美羊羊 道具</a>
-                        <span class="badge badge-hot">75w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 脱缰凯✨ (3174w+)</span>
-                        <span>🏷️ 小剧场</span>
-                        <span>💬 9161</span>
-                        <span>🔄 47452</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#11</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651292606542394297" target="_blank" class="card-title">瑶一瑶来摇一摇 哈哈哈哈哈哈哈#瑶一瑶小肉包</a>
-                        <span class="badge badge-hot">61w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 瑶一瑶小肉包 (1946w+)</span>
-                        <span>🏷️ 亲子</span>
-                        <span>💬 11373</span>
-                        <span>🔄 264277</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#12</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651542147560115494" target="_blank" class="card-title">蒜苔不就是食品版的拼豆吗 #拼豆</a>
-                        <span class="badge badge-hot">60w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 周大爷不服老！ (1819w+)</span>
-                        <span>🏷️ 美食</span>
-                        <span>💬 3080</span>
-                        <span>🔄 316688</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#13</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651500401325362442" target="_blank" class="card-title">孙悟空命格·心魔六耳CG《自渡》今日上线——若此身本是虚妄，又怕什么魂飞魄散？#王者心魔六耳CG  </a>
-                        <span class="badge badge-hot">58w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 王者荣耀 (2942w+)</span>
-                        <span>🏷️ 二次元</span>
-                        <span>💬 25886</span>
-                        <span>🔄 458365</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#14</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651298087231857913" target="_blank" class="card-title">打你一拳（已打码求放过）</a>
-                        <span class="badge badge-hot">51w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 霜降. (276w+)</span>
-                        <span>🏷️ 生活记录</span>
-                        <span>💬 2183</span>
-                        <span>🔄 95773</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#15</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651571704049634996" target="_blank" class="card-title">None</a>
-                        <span class="badge badge-hot">49w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 洛. </span>
-                        <span>🏷️ 生活记录</span>
-                        <span>💬 81680</span>
-                        <span>🔄 84312</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#16</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651433392559384805" target="_blank" class="card-title">手作人的奇思妙想，永远超出预期#陶瓷手作 #陶艺作品 #陶瓷diy #景德镇陶瓷 #陶瓷杯子</a>
-                        <span class="badge badge-hot">48w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 小林同学手作陶瓷 (1502)</span>
-                        <span>🏷️ 居家装修</span>
-                        <span>💬 4755</span>
-                        <span>🔄 327250</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#17</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651295005940066984" target="_blank" class="card-title">太有意思了，台词和人物太颠了哈哈哈(被作者发现就要下架了)#ai漫剧 #颠 #剧情搞笑  @Noah</a>
-                        <span class="badge badge-hot">47w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 TOT昕雯lian播 (230)</span>
-                        <span>🏷️ 影视</span>
-                        <span>💬 20430</span>
-                        <span>🔄 779039</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#18</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651596925876133247" target="_blank" class="card-title">终于等到了今年的六月十五号！！heatwaves！ #内容过于真实 #真实事件#heatwaves </a>
-                        <span class="badge badge-hot">44w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 xxokate (416w+)</span>
-                        <span>🏷️ 生活记录</span>
-                        <span>💬 6702</span>
-                        <span>🔄 46473</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#19</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651561321468786138" target="_blank" class="card-title">我的酸黄瓜还没看过自由女神像 #海边人这样吃</a>
-                        <span class="badge badge-hot">44w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 KIMKILLS (348w+)</span>
-                        <span>🏷️ 生活记录</span>
-                        <span>💬 10778</span>
-                        <span>🔄 301627</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#20</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="https://www.iesdouyin.com/share/video/7651294377679483273" target="_blank" class="card-title">我保證我是天使 只是偶爾有一點壞</a>
-                        <span class="badge badge-hot">43w赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 吃啥呢给我也来一口 (991w+)</span>
-                        <span>🏷️ 生活记录</span>
-                        <span>💬 3648</span>
-                        <span>🔄 30939</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
+            <h2 style="margin-bottom: 15px;">🎵 抖音每日热榜</h2>
+            <div id="douyinContent"><div class="loading">加载中</div></div>
         </section>
         
         <footer>
-            <p>RedFox Hub · 每日自动更新 · 数据来源: redfox.hk</p>
+            <p>每日自动更新 · 数据来源: redfox.hk</p>
         </footer>
     </div>
     
     <script>
+        // 当前加载的日期数据
+        let currentData = null;
+        
+        // 加载指定日期的数据
+        async function loadDate(date) {
+            try {
+                const response = await fetch(`history/${date}.json`);
+                if (!response.ok) throw new Error('Data not found');
+                currentData = await response.json();
+                renderAll();
+                document.getElementById('updateTime').textContent = 
+                    `更新时间: ${currentData.update_time}`;
+            } catch (e) {
+                console.error('Failed to load date:', e);
+                document.getElementById('updateTime').textContent = '加载失败，请刷新重试';
+            }
+        }
+        
+        // 渲染所有模块
+        function renderAll() {
+            if (!currentData) return;
+            
+            document.getElementById('hotspotContent').innerHTML = renderHotspot(currentData.hotspot);
+            document.getElementById('wechatOriginalContent').innerHTML = renderWechatOriginal(currentData.wechat_original);
+            document.getElementById('xhsContent').innerHTML = renderXHS(currentData.xhs_weekly);
+            document.getElementById('channelsContent').innerHTML = renderChannels(currentData.channels);
+            document.getElementById('douyinContent').innerHTML = renderDouyin(currentData.douyin);
+        }
+        
+        // 渲染热点
+        function renderHotspot(data) {
+            if (!data || !data.hotspots || data.hotspots.length === 0) {
+                return '<div class="empty-state">暂无数据</div>';
+            }
+            
+            let html = '';
+            data.hotspots.slice(0, 10).forEach((item, i) => {
+                const title = item.title || '未知标题';
+                const url = item.url || '#';
+                const plat = item.platName || '未知平台';
+                const hotScore = item.maxHotScore || 0;
+                const duration = item.topOfTheDayTime || '0';
+                
+                const hotDisplay = hotScore >= 10000 ? Math.floor(hotScore / 10000) + '万' : hotScore;
+                
+                const platMap = {
+                    '微博': 'plat-weibo', '抖音': 'plat-douyin', 'B站': 'plat-bilibili',
+                    '哔哩哔哩': 'plat-bilibili', '快手': 'plat-kuaishou', '知乎': 'plat-zhihu',
+                    '头条': 'plat-toutiao', '百度': 'plat-baidu'
+                };
+                const platClass = platMap[plat] || '';
+                
+                html += `<div class="card">
+                    <div class="hotspot-item">
+                        <div class="rank">#${i+1}</div>
+                        <div style="flex: 1;">
+                            <div class="card-header">
+                                <a href="${url}" target="_blank" class="card-title">${title}</a>
+                                <span class="badge badge-hot">${hotDisplay}</span>
+                            </div>
+                            <div class="meta">
+                                <span><span class="platform-tag ${platClass}">${plat}</span></span>
+                                <span>⏱️ 在榜${duration}小时</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            return html;
+        }
+        
+        // 渲染公众号原创
+        function renderWechatOriginal(data) {
+            if (!data || !data.articles || data.articles.length === 0) {
+                return '<div class="empty-state">暂无数据</div>';
+            }
+            
+            let html = '';
+            data.articles.slice(0, 20).forEach((article, i) => {
+                const title = article.title || '未知标题';
+                const url = article.url || '#';
+                const author = article.userName || article.author || '未知作者';
+                const readCount = article.readCount || 0;
+                const likeCount = article.likeCount || 0;
+                
+                const readStr = readCount >= 10000 ? Math.floor(readCount / 10000) + 'w' : readCount;
+                const likeStr = likeCount >= 10000 ? Math.floor(likeCount / 10000) + 'w' : likeCount;
+                
+                html += `<div class="card">
+                    <div class="hotspot-item">
+                        <div class="rank">#${i+1}</div>
+                        <div style="flex: 1;">
+                            <div class="card-header">
+                                <a href="${url}" target="_blank" class="card-title">${title}</a>
+                                <span class="badge badge-trend">原创</span>
+                            </div>
+                            <div class="meta">
+                                <span>✍️ ${author}</span>
+                                <span>👁️ ${readStr}阅读</span>
+                                <span>👍 ${likeStr}赞</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            return html;
+        }
+        
+        // 渲染小红书
+        function renderXHS(data) {
+            if (!data || !data.notes || data.notes.length === 0) {
+                return '<div class="empty-state">暂无数据</div>';
+            }
+            
+            let html = '';
+            data.notes.slice(0, 20).forEach((note, i) => {
+                const title = note.title || note.content || '未知笔记';
+                const author = note.userName || note.author || '未知作者';
+                const likes = note.likeCount || 0;
+                const comments = note.commentCount || 0;
+                const collects = note.collectCount || 0;
+                const category = note.category || '综合';
+                
+                const likeStr = likes >= 10000 ? Math.floor(likes / 10000) + 'w' : likes;
+                
+                html += `<div class="card">
+                    <div class="hotspot-item">
+                        <div class="rank">#${i+1}</div>
+                        <div style="flex: 1;">
+                            <div class="card-header">
+                                <span class="card-title">${title}</span>
+                                <span class="badge badge-hot">${likeStr}赞</span>
+                            </div>
+                            <div class="meta">
+                                <span>👤 ${author}</span>
+                                <span>🏷️ ${category}</span>
+                                <span>💬 ${comments}</span>
+                                <span>⭐ ${collects}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            return html;
+        }
+        
+        // 渲染视频号
+        function renderChannels(data) {
+            if (!data || !data.videos || data.videos.length === 0) {
+                return '<div class="empty-state">暂无数据</div>';
+            }
+            
+            let html = '';
+            data.videos.slice(0, 20).forEach(video => {
+                const title = video.title || '未知标题';
+                const author = video.userName || video.author || '未知作者';
+                const likes = video.likeCount || 0;
+                const shares = video.shareCount || 0;
+                const comments = video.commentCount || 0;
+                const category = video.type || video.category || 'AI';
+                
+                const likeStr = likes >= 10000 ? Math.floor(likes / 10000) + 'w' : likes;
+                const shareStr = shares >= 10000 ? Math.floor(shares / 10000) + 'w' : shares;
+                const commentStr = comments >= 10000 ? Math.floor(comments / 10000) + 'w' : comments;
+                
+                html += `<div class="card">
+                    <div class="card-header">
+                        <span class="card-title">${title}</span>
+                        <span class="badge badge-trend">${category}</span>
+                    </div>
+                    <div class="meta">
+                        <span>🎬 ${author}</span>
+                        <span>❤️ ${likeStr}赞</span>
+                        <span>🔄 ${shareStr}分享</span>
+                        <span>💬 ${commentStr}评论</span>
+                    </div>
+                </div>`;
+            });
+            return html;
+        }
+        
+        // 渲染抖音
+        function renderDouyin(data) {
+            if (!data || !data.videos || data.videos.length === 0) {
+                return '<div class="empty-state">暂无数据</div>';
+            }
+            
+            let html = '';
+            data.videos.slice(0, 20).forEach((video, i) => {
+                const title = video.title || video.content || '未知标题';
+                const url = video.workUrl || video.url || '#';
+                const author = video.accountName || video.authorName || '未知作者';
+                const fans = video.followerCount || 0;
+                const category = video.category || '-';
+                const likes = video.likeCount || 0;
+                const comments = video.commentCount || 0;
+                const shares = video.shareCount || 0;
+                
+                const fansStr = fans >= 10000 ? Math.floor(fans / 10000) + 'w+' : fans;
+                const likeStr = likes >= 10000 ? Math.floor(likes / 10000) + 'w' : likes;
+                
+                html += `<div class="card">
+                    <div class="hotspot-item">
+                        <div class="rank">#${i+1}</div>
+                        <div style="flex: 1;">
+                            <div class="card-header">
+                                <a href="${url}" target="_blank" class="card-title">${title}</a>
+                                <span class="badge badge-hot">${likeStr}赞</span>
+                            </div>
+                            <div class="meta">
+                                <span>👤 ${author} ${fans ? '(' + fansStr + ')' : ''}</span>
+                                <span>🏷️ ${category}</span>
+                                <span>💬 ${comments}</span>
+                                <span>🔄 ${shares}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            return html;
+        }
+        
+        // 切换标签页
         function showSection(id) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
             document.getElementById(id).classList.add('active');
-            document.querySelector('a[href="#" + id]').classList.add('active');
+            document.querySelector('a[href="#' + id + '"]').classList.add('active');
+            history.pushState(null, null, '#' + id);
         }
-        if (location.hash) {
-            showSection(location.hash.slice(1));
-        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            const select = document.getElementById('dateSelect');
+            const today = select.value || '2026-06-16';
+            loadDate(today);
+            
+            // 处理hash
+            if (location.hash) {
+                showSection(location.hash.slice(1));
+            }
+        });
     </script>
 </body>
 </html>

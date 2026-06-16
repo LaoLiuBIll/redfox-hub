@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-网站生成器 - 聚合多数据源生成静态网站
-使用字符串替换避免CSS括号冲突
+网站生成器 - 生成支持日期选择器的静态网站
+每天数据保存为独立JSON，前端JS动态加载
 """
 import os
 import sys
 import json
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+import shutil
 
 def load_json(path):
     """加载JSON文件"""
@@ -19,227 +20,65 @@ def load_json(path):
         print(f"Warning: could not load {path}: {e}", file=sys.stderr)
         return None
 
-def format_hotspot(data):
-    """格式化热点数据为HTML"""
-    if not data or 'hotspots' not in data or not data['hotspots']:
-        return '<div class="empty-state">暂无数据</div>'
-    
-    hotspots = data['hotspots'][:10]
-    html = ''
-    
-    for i, item in enumerate(hotspots, 1):
-        title = item.get('title', '未知标题')
-        url = item.get('url', '#')
-        plat = item.get('platName', '未知平台')
-        hot_score = item.get('maxHotScore') or 0
-        duration = item.get('topOfTheDayTime') or '0'
-        
-        # 热度格式化
-        if hot_score >= 10000:
-            hot_display = f"{hot_score // 10000}万"
-        else:
-            hot_display = str(hot_score)
-        
-        # 平台样式映射
-        plat_map = {
-            '微博': 'plat-weibo',
-            '抖音': 'plat-douyin',
-            'B站': 'plat-bilibili',
-            '哔哩哔哩': 'plat-bilibili',
-            '快手': 'plat-kuaishou',
-            '知乎': 'plat-zhihu',
-            '头条': 'plat-toutiao',
-            '百度': 'plat-baidu'
-        }
-        plat_class = plat_map.get(plat, '')
-        
-        html += f'''
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#{i}</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="{url}" target="_blank" class="card-title">{title}</a>
-                        <span class="badge badge-hot">{hot_display}</span>
-                    </div>
-                    <div class="meta">
-                        <span><span class="platform-tag {plat_class}">{plat}</span></span>
-                        <span>⏱️ 在榜{duration}小时</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        '''
-    
-    return html
+def save_json(path, data):
+    """保存JSON文件"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-def format_wechat_original(data):
-    """格式化公众号原创热门文章为HTML"""
-    if not data or 'articles' not in data or not data['articles']:
-        return '<div class="empty-state">暂无数据</div>'
+def collect_daily_data(date_str):
+    """收集指定日期的所有数据"""
+    data_dir = Path('data')
     
-    articles = data['articles'][:20]
-    html = ''
+    # 尝试多种文件名格式
+    def try_load(*paths):
+        for p in paths:
+            result = load_json(p)
+            if result:
+                return result
+        return None
     
-    for i, article in enumerate(articles, 1):
-        title = article.get('title', '未知标题')
-        url = article.get('url', '#')
-        author = article.get('userName', article.get('author', '未知作者'))
-        read_count = article.get('readCount') or 0
-        like_count = article.get('likeCount') or 0
-        
-        # 格式化数字
-        read_str = f"{read_count//10000}w" if read_count >= 10000 else str(read_count)
-        like_str = f"{like_count//10000}w" if like_count >= 10000 else str(like_count)
-        
-        html += f'''
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#{i}</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="{url}" target="_blank" class="card-title">{title}</a>
-                        <span class="badge badge-trend">原创</span>
-                    </div>
-                    <div class="meta">
-                        <span>✍️ {author}</span>
-                        <span>👁️ {read_str}阅读</span>
-                        <span>👍 {like_str}赞</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        '''
+    # 热点数据
+    hotspot = try_load(
+        data_dir / f'hotspot_{date_str}.json',
+        data_dir / 'hotspot_raw.json',
+        data_dir / 'hotspot_structured.json'
+    )
     
-    return html
-
-def format_xhs_weekly(data):
-    """格式化小红书每周热门笔记为HTML"""
-    if not data or 'notes' not in data or not data['notes']:
-        return '<div class="empty-state">暂无数据</div>'
+    # 公众号原创
+    wechat_original = try_load(
+        data_dir / f'wechat_original_{date_str}.json',
+        data_dir / 'wechat_original.json',
+        data_dir / 'gzh_feed.json'
+    )
     
-    notes = data['notes'][:20]
-    html = ''
+    # 小红书
+    xhs = try_load(
+        data_dir / f'xhs_weekly_{date_str}.json',
+        data_dir / 'xhs_weekly.json'
+    )
     
-    for i, note in enumerate(notes, 1):
-        title = note.get('title', note.get('content', '未知笔记'))
-        author = note.get('userName', note.get('author', '未知作者'))
-        likes = note.get('likeCount') or 0
-        comments = note.get('commentCount') or 0
-        collects = note.get('collectCount') or 0
-        category = note.get('category', '综合')
-        
-        # 格式化数字
-        like_str = f"{likes//10000}w" if likes >= 10000 else str(likes)
-        
-        html += f'''
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#{i}</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <span class="card-title">{title}</span>
-                        <span class="badge badge-hot">{like_str}赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 {author}</span>
-                        <span>🏷️ {category}</span>
-                        <span>💬 {comments}</span>
-                        <span>⭐ {collects}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        '''
+    # 视频号
+    channels = try_load(
+        data_dir / f'channels_{date_str}.json',
+        data_dir / 'channels_feed.json'
+    )
     
-    return html
-
-def format_channels(data):
-    """格式化视频号数据为HTML"""
-    if not data or 'videos' not in data or not data['videos']:
-        return '<div class="empty-state">暂无数据</div>'
+    # 抖音
+    douyin = try_load(
+        data_dir / f'douyin_{date_str}.json',
+        data_dir / 'douyin_hot.json'
+    )
     
-    videos = data['videos'][:20]
-    html = ''
-    
-    for video in videos:
-        title = video.get('title', '未知标题')
-        author = video.get('userName', video.get('author', '未知作者'))
-        likes = video.get('likeCount') or 0
-        shares = video.get('shareCount') or 0
-        comments = video.get('commentCount') or 0
-        category = video.get('type', video.get('category', 'AI'))
-        
-        # 格式化数字
-        like_str = f"{likes//10000}w" if likes >= 10000 else str(likes)
-        share_str = f"{shares//10000}w" if shares >= 10000 else str(shares)
-        comment_str = f"{comments//10000}w" if comments >= 10000 else str(comments)
-        
-        html += f'''
-        <div class="card">
-            <div class="card-header">
-                <span class="card-title">{title}</span>
-                <span class="badge badge-trend">{category}</span>
-            </div>
-            <div class="meta">
-                <span>🎬 {author}</span>
-                <span>❤️ {like_str}赞</span>
-                <span>🔄 {share_str}分享</span>
-                <span>💬 {comment_str}评论</span>
-            </div>
-        </div>
-        '''
-    
-    return html
-
-def format_douyin(data):
-    """格式化抖音数据为HTML"""
-    if not data or 'videos' not in data or not data['videos']:
-        return '<div class="empty-state">暂无数据</div>'
-    
-    videos = data['videos'][:20]
-    html = ''
-    
-    for i, video in enumerate(videos, 1):
-        title = video.get('title', video.get('content', '未知标题'))
-        url = video.get('workUrl', video.get('url', '#'))
-        author = video.get('accountName', video.get('authorName', '未知作者'))
-        fans = video.get('followerCount', '')
-        category = video.get('category', '-')
-        likes = video.get('likeCount', 0)
-        comments = video.get('commentCount', 0)
-        shares = video.get('shareCount', 0)
-        
-        # 格式化粉丝数
-        if fans:
-            fans_str = f"{fans//10000}w+" if fans >= 10000 else str(fans)
-        else:
-            fans_str = ''
-        
-        # 格式化点赞
-        like_str = f"{likes//10000}w" if likes >= 10000 else str(likes)
-        
-        html += f'''
-        <div class="card">
-            <div class="hotspot-item">
-                <div class="rank">#{i}</div>
-                <div style="flex: 1;">
-                    <div class="card-header">
-                        <a href="{url}" target="_blank" class="card-title">{title}</a>
-                        <span class="badge badge-hot">{like_str}赞</span>
-                    </div>
-                    <div class="meta">
-                        <span>👤 {author} {fans_str and '(' + fans_str + ')'}</span>
-                        <span>🏷️ {category}</span>
-                        <span>💬 {comments}</span>
-                        <span>🔄 {shares}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        '''
-    
-    return html
+    return {
+        "date": date_str,
+        "update_time": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        "hotspot": hotspot,
+        "wechat_original": wechat_original,
+        "xhs_weekly": xhs,
+        "channels": channels,
+        "douyin": douyin
+    }
 
 def generate_site(date_str=None):
     """生成完整网站"""
@@ -250,41 +89,26 @@ def generate_site(date_str=None):
     dist_dir = Path('dist')
     dist_dir.mkdir(exist_ok=True)
     
-    # 加载数据
-    hotspot_data = load_json(data_dir / 'hotspot_raw.json') or load_json(data_dir / 'hotspot_structured.json')
-    wechat_original_data = load_json(data_dir / 'wechat_original.json')
-    xhs_data = load_json(data_dir / 'xhs_weekly.json')
-    channels_data = load_json(data_dir / 'channels_feed.json')
-    douyin_data = load_json(data_dir / 'douyin_hot.json')
+    # 收集今日数据
+    daily_data = collect_daily_data(date_str)
     
-    # 如果没有专门的数据文件，使用gzh_feed.json作为备选
-    if not wechat_original_data:
-        wechat_original_data = load_json(data_dir / 'gzh_feed.json')
+    # 保存到历史数据目录
+    history_dir = dist_dir / 'history'
+    history_dir.mkdir(exist_ok=True)
+    save_json(history_dir / f'{date_str}.json', daily_data)
     
-    # 生成内容
-    hotspot_html = format_hotspot(hotspot_data)
-    wechat_original_html = format_wechat_original(wechat_original_data)
-    xhs_html = format_xhs_weekly(xhs_data)
-    channels_html = format_channels(channels_data)
-    douyin_html = format_douyin(douyin_data)
+    # 获取所有历史日期列表
+    history_dates = []
+    if history_dir.exists():
+        for f in sorted(history_dir.glob('*.json'), reverse=True):
+            history_dates.append(f.stem)
     
-    # 读取模板
-    template_path = Path(__file__).parent / 'site_template.html'
-    if template_path.exists():
-        template = template_path.read_text(encoding='utf-8')
-    else:
-        template = get_default_template()
+    # 如果没有历史记录，至少包含今天
+    if date_str not in history_dates:
+        history_dates.insert(0, date_str)
     
-    # 字符串替换
-    update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    html = template
-    html = html.replace('<!--UPDATE_TIME-->', update_time)
-    html = html.replace('<!--HOTSPOT_CONTENT-->', hotspot_html)
-    html = html.replace('<!--WECHAT_ORIGINAL_CONTENT-->', wechat_original_html)
-    html = html.replace('<!--XHS_CONTENT-->', xhs_html)
-    html = html.replace('<!--CHANNELS_CONTENT-->', channels_html)
-    html = html.replace('<!--DOUYIN_CONTENT-->', douyin_html)
+    # 生成HTML
+    html = generate_html(history_dates, date_str)
     
     # 写入文件
     output_path = dist_dir / 'index.html'
@@ -292,47 +116,72 @@ def generate_site(date_str=None):
         f.write(html)
     
     print(f"Site generated: {output_path}")
-    print(f"  - Hotspot items: {len(hotspot_data.get('hotspots', [])) if hotspot_data else 0}")
-    print(f"  - WeChat original articles: {len(wechat_original_data.get('articles', [])) if wechat_original_data else 0}")
-    print(f"  - XHS notes: {len(xhs_data.get('notes', [])) if xhs_data else 0}")
-    print(f"  - Channels videos: {len(channels_data.get('videos', [])) if channels_data else 0}")
-    print(f"  - Douyin videos: {len(douyin_data.get('videos', [])) if douyin_data else 0}")
+    print(f"  - History dates: {len(history_dates)}")
+    print(f"  - Current date: {date_str}")
     return output_path
 
-def get_default_template():
-    """默认HTML模板"""
-    return '''<!DOCTYPE html>
+def generate_html(history_dates, current_date):
+    """生成HTML页面"""
+    # 构建日期选项
+    date_options = ''
+    for d in history_dates:
+        selected = 'selected' if d == current_date else ''
+        display = datetime.strptime(d, '%Y-%m-%d').strftime('%Y年%m月%d日')
+        date_options += f'<option value="{d}" {selected}>{display}</option>\n'
+    
+    return f'''<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RedFox Hub - 每日热点聚合</title>
+    <title>一群胖子 - 每日热点聚合</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: #0a0a0f;
             color: #e0e0e0;
             line-height: 1.6;
-        }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        header {
+        }}
+        .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+        header {{
             text-align: center;
-            padding: 40px 0;
+            padding: 30px 0 20px;
             border-bottom: 1px solid #333;
-            margin-bottom: 30px;
-        }
-        h1 { font-size: 2.5em; color: #ff6b35; margin-bottom: 10px; }
-        .subtitle { color: #888; font-size: 1.1em; }
-        .update-time { color: #666; font-size: 0.9em; margin-top: 10px; }
-        .nav {
+            margin-bottom: 20px;
+        }}
+        h1 {{ font-size: 2.5em; color: #ff6b35; margin-bottom: 10px; }}
+        .subtitle {{ color: #888; font-size: 1.1em; }}
+        .date-selector {{
+            margin: 20px 0;
             display: flex;
             justify-content: center;
-            gap: 15px;
-            margin-bottom: 30px;
+            align-items: center;
+            gap: 10px;
+        }}
+        .date-selector label {{ color: #888; }}
+        .date-selector select {{
+            background: #1a1a2e;
+            color: #fff;
+            border: 1px solid #ff6b35;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            outline: none;
+        }}
+        .date-selector select:hover {{
+            background: #2a2a3e;
+        }}
+        .update-time {{ color: #666; font-size: 0.9em; margin-top: 10px; }}
+        .nav {{
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 25px;
             flex-wrap: wrap;
-        }
-        .nav a {
+        }}
+        .nav a {{
             color: #ff6b35;
             text-decoration: none;
             padding: 8px 16px;
@@ -340,106 +189,128 @@ def get_default_template():
             border-radius: 20px;
             transition: all 0.3s;
             font-size: 0.9em;
-        }
-        .nav a:hover, .nav a.active {
+            cursor: pointer;
+        }}
+        .nav a:hover, .nav a.active {{
             background: #ff6b35;
             color: #fff;
-        }
-        .section { display: none; animation: fadeIn 0.5s; }
-        .section.active { display: block; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .card {
+        }}
+        .section {{ display: none; animation: fadeIn 0.5s; }}
+        .section.active {{ display: block; }}
+        @keyframes fadeIn {{
+            from {{ opacity: 0; transform: translateY(20px); }}
+            to {{ opacity: 1; transform: translateY(0); }}
+        }}
+        .card {{
             background: #1a1a2e;
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
+            padding: 18px;
+            margin-bottom: 12px;
             border: 1px solid #2a2a3e;
             transition: transform 0.2s, border-color 0.2s;
-        }
-        .card:hover {
+        }}
+        .card:hover {{
             transform: translateX(5px);
             border-color: #ff6b35;
-        }
-        .card-header {
+        }}
+        .card-header {{
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             gap: 10px;
-        }
-        .card-title {
-            font-size: 1.1em;
+        }}
+        .card-title {{
+            font-size: 1.05em;
             color: #fff;
             text-decoration: none;
             flex: 1;
-        }
-        .card-title:hover { color: #ff6b35; }
-        .badge {
+        }}
+        .card-title:hover {{ color: #ff6b35; }}
+        .badge {{
             display: inline-block;
             padding: 3px 10px;
             border-radius: 10px;
             font-size: 0.75em;
             font-weight: bold;
             white-space: nowrap;
-        }
-        .badge-hot { background: #ff4444; color: #fff; }
-        .badge-trend { background: #ff6b35; color: #fff; }
-        .meta {
+        }}
+        .badge-hot {{ background: #ff4444; color: #fff; }}
+        .badge-trend {{ background: #ff6b35; color: #fff; }}
+        .meta {{
             display: flex;
             gap: 12px;
             color: #888;
             font-size: 0.85em;
-            margin-top: 8px;
+            margin-top: 6px;
             flex-wrap: wrap;
-        }
-        .rank {
-            font-size: 1.8em;
+        }}
+        .rank {{
+            font-size: 1.6em;
             font-weight: bold;
             color: #ff6b35;
-            min-width: 45px;
-        }
-        .hotspot-item {
+            min-width: 40px;
+        }}
+        .hotspot-item {{
             display: flex;
-            gap: 15px;
+            gap: 12px;
             align-items: start;
-        }
-        .platform-tag {
+        }}
+        .platform-tag {{
             display: inline-block;
             padding: 2px 6px;
             border-radius: 4px;
             font-size: 0.7em;
             margin-right: 5px;
-        }
-        .plat-weibo { background: #e6162d; }
-        .plat-douyin { background: #000; color: #fff; }
-        .plat-bilibili { background: #00a1d6; }
-        .plat-kuaishou { background: #ff5000; }
-        .plat-zhihu { background: #0084ff; }
-        .plat-toutiao { background: #f04142; }
-        .plat-baidu { background: #2932e1; }
-        .empty-state {
+        }}
+        .plat-weibo {{ background: #e6162d; }}
+        .plat-douyin {{ background: #000; color: #fff; }}
+        .plat-bilibili {{ background: #00a1d6; }}
+        .plat-kuaishou {{ background: #ff5000; }}
+        .plat-zhihu {{ background: #0084ff; }}
+        .plat-toutiao {{ background: #f04142; }}
+        .plat-baidu {{ background: #2932e1; }}
+        .empty-state {{
             text-align: center;
             padding: 60px 20px;
             color: #666;
-        }
-        footer {
+        }}
+        .loading {{
             text-align: center;
-            padding: 40px 0;
+            padding: 40px;
+            color: #888;
+        }}
+        .loading::after {{
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ff6b35;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }}
+        @keyframes spin {{
+            to {{ transform: rotate(360deg); }}
+        }}
+        footer {{
+            text-align: center;
+            padding: 30px 0;
             color: #666;
             border-top: 1px solid #333;
-            margin-top: 40px;
-        }
-        @media (max-width: 768px) {
-            h1 { font-size: 1.8em; }
-            .hotspot-item { flex-direction: column; }
-            .rank { font-size: 1.5em; }
-            .card-header { flex-direction: column; align-items: flex-start; }
-            .nav { gap: 8px; }
-            .nav a { padding: 6px 12px; font-size: 0.85em; }
-        }
+            margin-top: 30px;
+        }}
+        @media (max-width: 768px) {{
+            h1 {{ font-size: 1.8em; }}
+            .hotspot-item {{ flex-direction: column; }}
+            .rank {{ font-size: 1.3em; }}
+            .card-header {{ flex-direction: column; align-items: flex-start; }}
+            .nav {{ gap: 6px; }}
+            .nav a {{ padding: 6px 12px; font-size: 0.85em; }}
+            .date-selector {{ flex-direction: column; }}
+        }}
     </style>
 </head>
 <body>
@@ -447,40 +318,46 @@ def get_default_template():
         <header>
             <h1>一群胖子</h1>
             <p class="subtitle">全网热点聚合 · 原创内容 · 每周热榜</p>
-            <p class="update-time">更新时间: <!--UPDATE_TIME--></p>
+            <div class="date-selector">
+                <label>📅 选择日期：</label>
+                <select id="dateSelect" onchange="loadDate(this.value)">
+                    {date_options}
+                </select>
+            </div>
+            <p class="update-time" id="updateTime">加载中...</p>
         </header>
         
         <nav class="nav">
-            <a href="#hotspot" class="active" onclick="showSection(\'hotspot\')">全网热点</a>
-            <a href="#wechat-original" onclick="showSection(\'wechat-original\')">公众号原创</a>
-            <a href="#xhs" onclick="showSection(\'xhs\')">小红书热榜</a>
-            <a href="#channels" onclick="showSection(\'channels\')">视频号AI</a>
-            <a href="#douyin" onclick="showSection(\'douyin\')">抖音热榜</a>
+            <a href="#hotspot" class="active" onclick="showSection('hotspot')">🔥 全网热点</a>
+            <a href="#wechat-original" onclick="showSection('wechat-original')">📝 公众号原创</a>
+            <a href="#xhs" onclick="showSection('xhs')">📕 小红书热榜</a>
+            <a href="#channels" onclick="showSection('channels')">🎬 视频号AI</a>
+            <a href="#douyin" onclick="showSection('douyin')">🎵 抖音热榜</a>
         </nav>
         
         <section id="hotspot" class="section active">
-            <h2 style="margin-bottom: 20px;">🔥 全网聚合热点 TOP10</h2>
-            <!--HOTSPOT_CONTENT-->
+            <h2 style="margin-bottom: 15px;">🔥 全网聚合热点 TOP10</h2>
+            <div id="hotspotContent"><div class="loading">加载中</div></div>
         </section>
         
         <section id="wechat-original" class="section">
-            <h2 style="margin-bottom: 20px;">📝 公众号原创热门文章</h2>
-            <!--WECHAT_ORIGINAL_CONTENT-->
+            <h2 style="margin-bottom: 15px;">📝 公众号原创热门文章</h2>
+            <div id="wechatOriginalContent"><div class="loading">加载中</div></div>
         </section>
         
         <section id="xhs" class="section">
-            <h2 style="margin-bottom: 20px;">📕 小红书每周热门笔记</h2>
-            <!--XHS_CONTENT-->
+            <h2 style="margin-bottom: 15px;">📕 小红书每周热门笔记</h2>
+            <div id="xhsContent"><div class="loading">加载中</div></div>
         </section>
         
         <section id="channels" class="section">
-            <h2 style="margin-bottom: 20px;">🎬 视频号AI热门</h2>
-            <!--CHANNELS_CONTENT-->
+            <h2 style="margin-bottom: 15px;">🎬 视频号AI热门</h2>
+            <div id="channelsContent"><div class="loading">加载中</div></div>
         </section>
         
         <section id="douyin" class="section">
-            <h2 style="margin-bottom: 20px;">🎵 抖音每日热榜</h2>
-            <!--DOUYIN_CONTENT-->
+            <h2 style="margin-bottom: 15px;">🎵 抖音每日热榜</h2>
+            <div id="douyinContent"><div class="loading">加载中</div></div>
         </section>
         
         <footer>
@@ -489,15 +366,248 @@ def get_default_template():
     </div>
     
     <script>
-        function showSection(id) {
-            document.querySelectorAll(\'.section\').forEach(s => s.classList.remove(\'active\'));
-            document.querySelectorAll(\'.nav a\').forEach(a => a.classList.remove(\'active\'));
-            document.getElementById(id).classList.add(\'active\');
-            document.querySelector(\'a[href="#" + id]\').classList.add(\'active\');
-        }
-        if (location.hash) {
-            showSection(location.hash.slice(1));
-        }
+        // 当前加载的日期数据
+        let currentData = null;
+        
+        // 加载指定日期的数据
+        async function loadDate(date) {{
+            try {{
+                const response = await fetch(`history/${{date}}.json`);
+                if (!response.ok) throw new Error('Data not found');
+                currentData = await response.json();
+                renderAll();
+                document.getElementById('updateTime').textContent = 
+                    `更新时间: ${{currentData.update_time}}`;
+            }} catch (e) {{
+                console.error('Failed to load date:', e);
+                document.getElementById('updateTime').textContent = '加载失败，请刷新重试';
+            }}
+        }}
+        
+        // 渲染所有模块
+        function renderAll() {{
+            if (!currentData) return;
+            
+            document.getElementById('hotspotContent').innerHTML = renderHotspot(currentData.hotspot);
+            document.getElementById('wechatOriginalContent').innerHTML = renderWechatOriginal(currentData.wechat_original);
+            document.getElementById('xhsContent').innerHTML = renderXHS(currentData.xhs_weekly);
+            document.getElementById('channelsContent').innerHTML = renderChannels(currentData.channels);
+            document.getElementById('douyinContent').innerHTML = renderDouyin(currentData.douyin);
+        }}
+        
+        // 渲染热点
+        function renderHotspot(data) {{
+            if (!data || !data.hotspots || data.hotspots.length === 0) {{
+                return '<div class="empty-state">暂无数据</div>';
+            }}
+            
+            let html = '';
+            data.hotspots.slice(0, 10).forEach((item, i) => {{
+                const title = item.title || '未知标题';
+                const url = item.url || '#';
+                const plat = item.platName || '未知平台';
+                const hotScore = item.maxHotScore || 0;
+                const duration = item.topOfTheDayTime || '0';
+                
+                const hotDisplay = hotScore >= 10000 ? Math.floor(hotScore / 10000) + '万' : hotScore;
+                
+                const platMap = {{
+                    '微博': 'plat-weibo', '抖音': 'plat-douyin', 'B站': 'plat-bilibili',
+                    '哔哩哔哩': 'plat-bilibili', '快手': 'plat-kuaishou', '知乎': 'plat-zhihu',
+                    '头条': 'plat-toutiao', '百度': 'plat-baidu'
+                }};
+                const platClass = platMap[plat] || '';
+                
+                html += `<div class="card">
+                    <div class="hotspot-item">
+                        <div class="rank">#${{i+1}}</div>
+                        <div style="flex: 1;">
+                            <div class="card-header">
+                                <a href="${{url}}" target="_blank" class="card-title">${{title}}</a>
+                                <span class="badge badge-hot">${{hotDisplay}}</span>
+                            </div>
+                            <div class="meta">
+                                <span><span class="platform-tag ${{platClass}}">${{plat}}</span></span>
+                                <span>⏱️ 在榜${{duration}}小时</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }});
+            return html;
+        }}
+        
+        // 渲染公众号原创
+        function renderWechatOriginal(data) {{
+            if (!data || !data.articles || data.articles.length === 0) {{
+                return '<div class="empty-state">暂无数据</div>';
+            }}
+            
+            let html = '';
+            data.articles.slice(0, 20).forEach((article, i) => {{
+                const title = article.title || '未知标题';
+                const url = article.url || '#';
+                const author = article.userName || article.author || '未知作者';
+                const readCount = article.readCount || 0;
+                const likeCount = article.likeCount || 0;
+                
+                const readStr = readCount >= 10000 ? Math.floor(readCount / 10000) + 'w' : readCount;
+                const likeStr = likeCount >= 10000 ? Math.floor(likeCount / 10000) + 'w' : likeCount;
+                
+                html += `<div class="card">
+                    <div class="hotspot-item">
+                        <div class="rank">#${{i+1}}</div>
+                        <div style="flex: 1;">
+                            <div class="card-header">
+                                <a href="${{url}}" target="_blank" class="card-title">${{title}}</a>
+                                <span class="badge badge-trend">原创</span>
+                            </div>
+                            <div class="meta">
+                                <span>✍️ ${{author}}</span>
+                                <span>👁️ ${{readStr}}阅读</span>
+                                <span>👍 ${{likeStr}}赞</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }});
+            return html;
+        }}
+        
+        // 渲染小红书
+        function renderXHS(data) {{
+            if (!data || !data.notes || data.notes.length === 0) {{
+                return '<div class="empty-state">暂无数据</div>';
+            }}
+            
+            let html = '';
+            data.notes.slice(0, 20).forEach((note, i) => {{
+                const title = note.title || note.content || '未知笔记';
+                const author = note.userName || note.author || '未知作者';
+                const likes = note.likeCount || 0;
+                const comments = note.commentCount || 0;
+                const collects = note.collectCount || 0;
+                const category = note.category || '综合';
+                
+                const likeStr = likes >= 10000 ? Math.floor(likes / 10000) + 'w' : likes;
+                
+                html += `<div class="card">
+                    <div class="hotspot-item">
+                        <div class="rank">#${{i+1}}</div>
+                        <div style="flex: 1;">
+                            <div class="card-header">
+                                <span class="card-title">${{title}}</span>
+                                <span class="badge badge-hot">${{likeStr}}赞</span>
+                            </div>
+                            <div class="meta">
+                                <span>👤 ${{author}}</span>
+                                <span>🏷️ ${{category}}</span>
+                                <span>💬 ${{comments}}</span>
+                                <span>⭐ ${{collects}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }});
+            return html;
+        }}
+        
+        // 渲染视频号
+        function renderChannels(data) {{
+            if (!data || !data.videos || data.videos.length === 0) {{
+                return '<div class="empty-state">暂无数据</div>';
+            }}
+            
+            let html = '';
+            data.videos.slice(0, 20).forEach(video => {{
+                const title = video.title || '未知标题';
+                const author = video.userName || video.author || '未知作者';
+                const likes = video.likeCount || 0;
+                const shares = video.shareCount || 0;
+                const comments = video.commentCount || 0;
+                const category = video.type || video.category || 'AI';
+                
+                const likeStr = likes >= 10000 ? Math.floor(likes / 10000) + 'w' : likes;
+                const shareStr = shares >= 10000 ? Math.floor(shares / 10000) + 'w' : shares;
+                const commentStr = comments >= 10000 ? Math.floor(comments / 10000) + 'w' : comments;
+                
+                html += `<div class="card">
+                    <div class="card-header">
+                        <span class="card-title">${{title}}</span>
+                        <span class="badge badge-trend">${{category}}</span>
+                    </div>
+                    <div class="meta">
+                        <span>🎬 ${{author}}</span>
+                        <span>❤️ ${{likeStr}}赞</span>
+                        <span>🔄 ${{shareStr}}分享</span>
+                        <span>💬 ${{commentStr}}评论</span>
+                    </div>
+                </div>`;
+            }});
+            return html;
+        }}
+        
+        // 渲染抖音
+        function renderDouyin(data) {{
+            if (!data || !data.videos || data.videos.length === 0) {{
+                return '<div class="empty-state">暂无数据</div>';
+            }}
+            
+            let html = '';
+            data.videos.slice(0, 20).forEach((video, i) => {{
+                const title = video.title || video.content || '未知标题';
+                const url = video.workUrl || video.url || '#';
+                const author = video.accountName || video.authorName || '未知作者';
+                const fans = video.followerCount || 0;
+                const category = video.category || '-';
+                const likes = video.likeCount || 0;
+                const comments = video.commentCount || 0;
+                const shares = video.shareCount || 0;
+                
+                const fansStr = fans >= 10000 ? Math.floor(fans / 10000) + 'w+' : fans;
+                const likeStr = likes >= 10000 ? Math.floor(likes / 10000) + 'w' : likes;
+                
+                html += `<div class="card">
+                    <div class="hotspot-item">
+                        <div class="rank">#${{i+1}}</div>
+                        <div style="flex: 1;">
+                            <div class="card-header">
+                                <a href="${{url}}" target="_blank" class="card-title">${{title}}</a>
+                                <span class="badge badge-hot">${{likeStr}}赞</span>
+                            </div>
+                            <div class="meta">
+                                <span>👤 ${{author}} ${{fans ? '(' + fansStr + ')' : ''}}</span>
+                                <span>🏷️ ${{category}}</span>
+                                <span>💬 ${{comments}}</span>
+                                <span>🔄 ${{shares}}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }});
+            return html;
+        }}
+        
+        // 切换标签页
+        function showSection(id) {{
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.querySelector('a[href="#' + id + '"]').classList.add('active');
+            history.pushState(null, null, '#' + id);
+        }}
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {{
+            const select = document.getElementById('dateSelect');
+            const today = select.value || '{current_date}';
+            loadDate(today);
+            
+            // 处理hash
+            if (location.hash) {{
+                showSection(location.hash.slice(1));
+            }}
+        }});
     </script>
 </body>
 </html>'''

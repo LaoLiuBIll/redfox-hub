@@ -21,6 +21,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 保留历史数据
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -31,42 +34,53 @@ jobs:
         run: |
           pip install python-dateutil==2.8.2 requests
 
-      - name: Fetch trending hub top10
+      - name: Fetch all data sources
         env:
           REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
         run: |
           mkdir -p data
-          python scripts/fetch_hotspot.py --output data/hotspot_raw.json
+          DATE=$(date +%Y-%m-%d)
+          
+          # 热点
+          python scripts/fetch_hotspot.py --output data/hotspot_raw.json || true
+          
+          # 公众号原创（带日期）
+          python scripts/fetch_wechat_original.py --type "总排名" --limit 50 --output data/wechat_original_${DATE}.json || \
+          python scripts/fetch_gzh.py --count 50 --output data/gzh_feed.json || true
+          
+          # 小红书（带日期）
+          python scripts/fetch_xhs_weekly.py --keyword "综合全部" --top-n 50 --output data/xhs_weekly_${DATE}.json || \
+          echo '{"status":"empty","notes":[]}' > data/xhs_weekly_${DATE}.json
+          
+          # 视频号
+          python scripts/fetch_channels.py --page-size 50 --output data/channels_${DATE}.json || \
+          python scripts/fetch_channels.py --page-size 50 --output data/channels_feed.json || true
+          
+          # 抖音
+          python scripts/fetch_douyin.py --limit 50 --output data/douyin_${DATE}.json || \
+          python scripts/fetch_douyin.py --limit 50 --output data/douyin_hot.json || true
 
-      - name: Fetch wechat original hot
-        env:
-          REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
+      - name: Generate site with history
         run: |
-          python scripts/fetch_wechat_original.py --type "总排名" --limit 50 --output data/wechat_original.json || \
-          python scripts/fetch_gzh.py --count 50 --output data/gzh_feed.json
-
-      - name: Fetch xiaohongshu weekly
-        env:
-          REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
-        run: |
-          python scripts/fetch_xhs_weekly.py --keyword "综合全部" --top-n 50 --output data/xhs_weekly.json || \
-          echo '{"status":"empty","notes":[]}' > data/xhs_weekly.json
-
-      - name: Fetch wechat channels AI feed
-        env:
-          REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
-        run: |
-          python scripts/fetch_channels.py --page-size 50 --output data/channels_feed.json
-
-      - name: Fetch douyin daily hot
-        env:
-          REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
-        run: |
-          python scripts/fetch_douyin.py --limit 50 --output data/douyin_hot.json
-
-      - name: Generate site
-        run: |
+          # 生成今日站点，同时保留历史数据
           python scripts/generate_site.py --date $(date +%Y-%m-%d)
+          
+          # 复制历史数据到dist目录
+          mkdir -p dist/history
+          if [ -d data ]; then
+            # 复制所有带日期的历史文件
+            cp data/hotspot_*.json dist/history/ 2>/dev/null || true
+            cp data/wechat_original_*.json dist/history/ 2>/dev/null || true
+            cp data/xhs_weekly_*.json dist/history/ 2>/dev/null || true
+            cp data/channels_*.json dist/history/ 2>/dev/null || true
+            cp data/douyin_*.json dist/history/ 2>/dev/null || true
+          fi
+          
+          # 确保今天的数据也在history中
+          cp data/*_$(date +%Y-%m-%d).json dist/history/ 2>/dev/null || true
+          
+          echo "History files:"
+          ls -la dist/history/ || true
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
