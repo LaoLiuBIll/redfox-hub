@@ -33,26 +33,34 @@ jobs:
 
       - name: Fetch trending hub top10
         env:
-          REDFOX_API_KEY: ${{ secrets.EDFOX_API_KEY }}
+          REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
         run: |
           mkdir -p data
           python scripts/fetch_hotspot.py --output data/hotspot_raw.json
 
-      - name: Fetch gzh AI feed
+      - name: Fetch wechat original hot
         env:
-          REDFOX_API_KEY: ${{ secrets.EDFOX_API_KEY }}
+          REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
         run: |
+          python scripts/fetch_wechat_original.py --type "总排名" --limit 50 --output data/wechat_original.json || \
           python scripts/fetch_gzh.py --count 50 --output data/gzh_feed.json
+
+      - name: Fetch xiaohongshu weekly
+        env:
+          REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
+        run: |
+          python scripts/fetch_xhs_weekly.py --keyword "综合全部" --top-n 50 --output data/xhs_weekly.json || \
+          echo '{"status":"empty","notes":[]}' > data/xhs_weekly.json
 
       - name: Fetch wechat channels AI feed
         env:
-          REDFOX_API_KEY: ${{ secrets.EDFOX_API_KEY }}
+          REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
         run: |
           python scripts/fetch_channels.py --page-size 50 --output data/channels_feed.json
 
       - name: Fetch douyin daily hot
         env:
-          REDFOX_API_KEY: ${{ secrets.EDFOX_API_KEY }}
+          REDFOX_API_KEY: *** secrets.EDFOX_API_KEY }}
         run: |
           python scripts/fetch_douyin.py --limit 50 --output data/douyin_hot.json
 

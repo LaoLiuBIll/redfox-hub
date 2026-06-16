@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-网站生成器 - 聚合4个数据源生成静态网站
+网站生成器 - 聚合多数据源生成静态网站
 使用字符串替换避免CSS括号冲突
 """
 import os
@@ -73,53 +73,24 @@ def format_hotspot(data):
     
     return html
 
-def format_gzh_accounts(data):
-    """从公众号文章数据中提取热门账号推荐"""
+def format_wechat_original(data):
+    """格式化公众号原创热门文章为HTML"""
     if not data or 'articles' not in data or not data['articles']:
         return '<div class="empty-state">暂无数据</div>'
     
-    articles = data['articles']
+    articles = data['articles'][:20]
+    html = ''
     
-    # 按账号聚合数据
-    accounts = {}
-    for article in articles:
-        user_name = article.get('userName', '未知账号')
-        user_head = article.get('userHeadUrl', '')
+    for i, article in enumerate(articles, 1):
+        title = article.get('title', '未知标题')
+        url = article.get('url', '#')
+        author = article.get('userName', article.get('author', '未知作者'))
         read_count = article.get('readCount') or 0
         like_count = article.get('likeCount') or 0
         
-        if user_name not in accounts:
-            accounts[user_name] = {
-                'name': user_name,
-                'head': user_head,
-                'articles': 0,
-                'total_reads': 0,
-                'total_likes': 0,
-                'latest_article': article.get('title', '')
-            }
-        
-        accounts[user_name]['articles'] += 1
-        accounts[user_name]['total_reads'] += read_count
-        accounts[user_name]['total_likes'] += like_count
-    
-    # 按总阅读量排序
-    sorted_accounts = sorted(accounts.values(), key=lambda x: x['total_reads'], reverse=True)
-    
-    html = ''
-    for i, account in enumerate(sorted_accounts[:15], 1):
-        name = account['name']
-        head = account['head']
-        articles = account['articles']
-        reads = account['total_reads']
-        likes = account['total_likes']
-        latest = account['latest_article']
-        
         # 格式化数字
-        reads_str = f"{reads//10000}w" if reads >= 10000 else str(reads)
-        likes_str = f"{likes//10000}w" if likes >= 10000 else str(likes)
-        
-        # 头像
-        head_img = f'<img src="{head}" style="width:40px;height:40px;border-radius:50%;margin-right:10px;" />' if head else ''
+        read_str = f"{read_count//10000}w" if read_count >= 10000 else str(read_count)
+        like_str = f"{like_count//10000}w" if like_count >= 10000 else str(like_count)
         
         html += f'''
         <div class="card">
@@ -127,18 +98,54 @@ def format_gzh_accounts(data):
                 <div class="rank">#{i}</div>
                 <div style="flex: 1;">
                     <div class="card-header">
-                        <div style="display:flex;align-items:center;">
-                            {head_img}
-                            <span class="card-title">{name}</span>
-                        </div>
-                        <span class="badge badge-hot">{reads_str}阅读</span>
+                        <a href="{url}" target="_blank" class="card-title">{title}</a>
+                        <span class="badge badge-trend">原创</span>
                     </div>
                     <div class="meta">
-                        <span>📝 {articles}篇文章</span>
-                        <span>👍 {likes_str}赞</span>
+                        <span>✍️ {author}</span>
+                        <span>👁️ {read_str}阅读</span>
+                        <span>👍 {like_str}赞</span>
                     </div>
-                    <div style="margin-top:8px;color:#aaa;font-size:0.85em;">
-                        最新: {latest}
+                </div>
+            </div>
+        </div>
+        '''
+    
+    return html
+
+def format_xhs_weekly(data):
+    """格式化小红书每周热门笔记为HTML"""
+    if not data or 'notes' not in data or not data['notes']:
+        return '<div class="empty-state">暂无数据</div>'
+    
+    notes = data['notes'][:20]
+    html = ''
+    
+    for i, note in enumerate(notes, 1):
+        title = note.get('title', note.get('content', '未知笔记'))
+        author = note.get('userName', note.get('author', '未知作者'))
+        likes = note.get('likeCount') or 0
+        comments = note.get('commentCount') or 0
+        collects = note.get('collectCount') or 0
+        category = note.get('category', '综合')
+        
+        # 格式化数字
+        like_str = f"{likes//10000}w" if likes >= 10000 else str(likes)
+        
+        html += f'''
+        <div class="card">
+            <div class="hotspot-item">
+                <div class="rank">#{i}</div>
+                <div style="flex: 1;">
+                    <div class="card-header">
+                        <span class="card-title">{title}</span>
+                        <span class="badge badge-hot">{like_str}赞</span>
+                    </div>
+                    <div class="meta">
+                        <span>👤 {author}</span>
+                        <span>🏷️ {category}</span>
+                        <span>💬 {comments}</span>
+                        <span>⭐ {collects}</span>
                     </div>
                 </div>
             </div>
@@ -243,15 +250,21 @@ def generate_site(date_str=None):
     dist_dir = Path('dist')
     dist_dir.mkdir(exist_ok=True)
     
-    # 加载数据（支持多种文件名）
+    # 加载数据
     hotspot_data = load_json(data_dir / 'hotspot_raw.json') or load_json(data_dir / 'hotspot_structured.json')
-    gzh_data = load_json(data_dir / 'gzh_feed.json')
+    wechat_original_data = load_json(data_dir / 'wechat_original.json')
+    xhs_data = load_json(data_dir / 'xhs_weekly.json')
     channels_data = load_json(data_dir / 'channels_feed.json')
     douyin_data = load_json(data_dir / 'douyin_hot.json')
     
+    # 如果没有专门的数据文件，使用gzh_feed.json作为备选
+    if not wechat_original_data:
+        wechat_original_data = load_json(data_dir / 'gzh_feed.json')
+    
     # 生成内容
     hotspot_html = format_hotspot(hotspot_data)
-    gzh_html = format_gzh_accounts(gzh_data)
+    wechat_original_html = format_wechat_original(wechat_original_data)
+    xhs_html = format_xhs_weekly(xhs_data)
     channels_html = format_channels(channels_data)
     douyin_html = format_douyin(douyin_data)
     
@@ -260,16 +273,16 @@ def generate_site(date_str=None):
     if template_path.exists():
         template = template_path.read_text(encoding='utf-8')
     else:
-        # 使用内联模板
         template = get_default_template()
     
-    # 字符串替换（避免format的括号冲突）
+    # 字符串替换
     update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     html = template
     html = html.replace('<!--UPDATE_TIME-->', update_time)
     html = html.replace('<!--HOTSPOT_CONTENT-->', hotspot_html)
-    html = html.replace('<!--GZH_CONTENT-->', gzh_html)
+    html = html.replace('<!--WECHAT_ORIGINAL_CONTENT-->', wechat_original_html)
+    html = html.replace('<!--XHS_CONTENT-->', xhs_html)
     html = html.replace('<!--CHANNELS_CONTENT-->', channels_html)
     html = html.replace('<!--DOUYIN_CONTENT-->', douyin_html)
     
@@ -280,7 +293,8 @@ def generate_site(date_str=None):
     
     print(f"Site generated: {output_path}")
     print(f"  - Hotspot items: {len(hotspot_data.get('hotspots', [])) if hotspot_data else 0}")
-    print(f"  - GZH articles: {len(gzh_data.get('articles', [])) if gzh_data else 0}")
+    print(f"  - WeChat original articles: {len(wechat_original_data.get('articles', [])) if wechat_original_data else 0}")
+    print(f"  - XHS notes: {len(xhs_data.get('notes', [])) if xhs_data else 0}")
     print(f"  - Channels videos: {len(channels_data.get('videos', [])) if channels_data else 0}")
     print(f"  - Douyin videos: {len(douyin_data.get('videos', [])) if douyin_data else 0}")
     return output_path
@@ -314,17 +328,18 @@ def get_default_template():
         .nav {
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 15px;
             margin-bottom: 30px;
             flex-wrap: wrap;
         }
         .nav a {
             color: #ff6b35;
             text-decoration: none;
-            padding: 10px 20px;
+            padding: 8px 16px;
             border: 1px solid #ff6b35;
-            border-radius: 25px;
+            border-radius: 20px;
             transition: all 0.3s;
+            font-size: 0.9em;
         }
         .nav a:hover, .nav a.active {
             background: #ff6b35;
@@ -340,7 +355,7 @@ def get_default_template():
             background: #1a1a2e;
             border-radius: 12px;
             padding: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             border: 1px solid #2a2a3e;
             transition: transform 0.2s, border-color 0.2s;
         }
@@ -356,7 +371,7 @@ def get_default_template():
             gap: 10px;
         }
         .card-title {
-            font-size: 1.2em;
+            font-size: 1.1em;
             color: #fff;
             text-decoration: none;
             flex: 1;
@@ -364,9 +379,9 @@ def get_default_template():
         .card-title:hover { color: #ff6b35; }
         .badge {
             display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.8em;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.75em;
             font-weight: bold;
             white-space: nowrap;
         }
@@ -374,28 +389,28 @@ def get_default_template():
         .badge-trend { background: #ff6b35; color: #fff; }
         .meta {
             display: flex;
-            gap: 15px;
+            gap: 12px;
             color: #888;
-            font-size: 0.9em;
-            margin-top: 10px;
+            font-size: 0.85em;
+            margin-top: 8px;
             flex-wrap: wrap;
         }
         .rank {
-            font-size: 2em;
+            font-size: 1.8em;
             font-weight: bold;
             color: #ff6b35;
-            min-width: 50px;
+            min-width: 45px;
         }
         .hotspot-item {
             display: flex;
-            gap: 20px;
+            gap: 15px;
             align-items: start;
         }
         .platform-tag {
             display: inline-block;
-            padding: 2px 8px;
+            padding: 2px 6px;
             border-radius: 4px;
-            font-size: 0.75em;
+            font-size: 0.7em;
             margin-right: 5px;
         }
         .plat-weibo { background: #e6162d; }
@@ -422,6 +437,8 @@ def get_default_template():
             .hotspot-item { flex-direction: column; }
             .rank { font-size: 1.5em; }
             .card-header { flex-direction: column; align-items: flex-start; }
+            .nav { gap: 8px; }
+            .nav a { padding: 6px 12px; font-size: 0.85em; }
         }
     </style>
 </head>
@@ -429,34 +446,40 @@ def get_default_template():
     <div class="container">
         <header>
             <h1>RedFox Hub</h1>
-            <p class="subtitle">全网热点聚合 · AI资讯日报 · 抖音热榜</p>
+            <p class="subtitle">全网热点聚合 · 原创内容 · 每周热榜</p>
             <p class="update-time">更新时间: <!--UPDATE_TIME--></p>
         </header>
         
         <nav class="nav">
             <a href="#hotspot" class="active" onclick="showSection(\'hotspot\')">全网热点</a>
-            <a href="#gzh" onclick="showSection(\'gzh\')">公众号热门</a>
+            <a href="#wechat-original" onclick="showSection(\'wechat-original\')">公众号原创</a>
+            <a href="#xhs" onclick="showSection(\'xhs\')">小红书热榜</a>
             <a href="#channels" onclick="showSection(\'channels\')">视频号AI</a>
             <a href="#douyin" onclick="showSection(\'douyin\')">抖音热榜</a>
         </nav>
         
         <section id="hotspot" class="section active">
-            <h2 style="margin-bottom: 20px;">全网聚合热点 TOP10</h2>
+            <h2 style="margin-bottom: 20px;">🔥 全网聚合热点 TOP10</h2>
             <!--HOTSPOT_CONTENT-->
         </section>
         
-        <section id="gzh" class="section">
-            <h2 style="margin-bottom: 20px;">公众号热门账号推荐</h2>
-            <!--GZH_CONTENT-->
+        <section id="wechat-original" class="section">
+            <h2 style="margin-bottom: 20px;">📝 公众号原创热门文章</h2>
+            <!--WECHAT_ORIGINAL_CONTENT-->
+        </section>
+        
+        <section id="xhs" class="section">
+            <h2 style="margin-bottom: 20px;">📕 小红书每周热门笔记</h2>
+            <!--XHS_CONTENT-->
         </section>
         
         <section id="channels" class="section">
-            <h2 style="margin-bottom: 20px;">视频号AI热门</h2>
+            <h2 style="margin-bottom: 20px;">🎬 视频号AI热门</h2>
             <!--CHANNELS_CONTENT-->
         </section>
         
         <section id="douyin" class="section">
-            <h2 style="margin-bottom: 20px;">抖音每日热榜</h2>
+            <h2 style="margin-bottom: 20px;">🎵 抖音每日热榜</h2>
             <!--DOUYIN_CONTENT-->
         </section>
         
