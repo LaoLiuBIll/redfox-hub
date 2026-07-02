@@ -190,7 +190,8 @@
             <div class="date-selector">
                 <label>📅 选择日期：</label>
                 <select id="dateSelect" onchange="loadDate(this.value)">
-                    <option value="2026-07-01" selected>2026年07月01日</option>
+                    <option value="2026-07-02" selected>2026年07月02日</option>
+<option value="2026-07-01" >2026年07月01日</option>
 <option value="2026-06-30" >2026年06月30日</option>
 <option value="2026-06-29" >2026年06月29日</option>
 <option value="2026-06-28" >2026年06月28日</option>
@@ -477,7 +478,7 @@
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
             const select = document.getElementById('dateSelect');
-            const today = select.value || '2026-07-01';
+            const today = select.value || '2026-07-02';
             loadDate(today);
             
             // 处理hash
